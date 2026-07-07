@@ -1,633 +1,573 @@
-/* ═══════════════════════════════════════════════════════════════════
-   ALEX MORGAN — PORTFOLIO  |  script.js
-   All interactions, animations, canvas, cursor, typing, etc.
-═══════════════════════════════════════════════════════════════════ */
+/**
+ * EMMANUEL OLUYEMI — PORTFOLIO ENGINE
+ * 3D Ambient Canvas (Three.js) + UI Interactions
+ * Clean, Creative, and Senior Design Engineering Pattern
+ */
 
-'use strict';
+document.addEventListener('DOMContentLoaded', () => {
 
-/* ─── UTILS ──────────────────────────────────────────────────────── */
-const $ = (sel, ctx = document) => ctx.querySelector(sel);
-const $$ = (sel, ctx = document) => [...ctx.querySelectorAll(sel)];
-const clamp = (n, min, max) => Math.min(Math.max(n, min), max);
-
-/* ─── 1. PRELOADER ───────────────────────────────────────────────── */
-(function initPreloader() {
-  const preloader = $('#preloader');
-  const fill      = preloader && $('.preloader-fill', preloader);
-  const text      = preloader && $('.preloader-text', preloader);
-
-  const steps = [
-    { pct: 20, msg: 'Loading assets...' },
-    { pct: 50, msg: 'Preparing layout...' },
-    { pct: 75, msg: 'Firing up canvas...' },
-    { pct: 100, msg: 'Ready.' },
-  ];
-
-  let i = 0;
-  const run = () => {
-    if (!preloader || i >= steps.length) return;
-    const { pct, msg } = steps[i++];
-    if (fill) fill.style.width = pct + '%';
-    if (text) text.textContent = msg;
-    if (pct < 100) {
-      setTimeout(run, 300 + Math.random() * 200);
-    } else {
-      setTimeout(() => {
-        preloader.classList.add('hidden');
-        document.body.style.removeProperty('overflow');
-        // Start hero entrance
-        $$('.reveal-up, .reveal-left, .reveal-right').forEach(el => {
-          if (isInViewport(el)) el.classList.add('visible');
-        });
-      }, 500);
-    }
-  };
-
-  document.body.style.overflow = 'hidden';
-  setTimeout(run, 200);
-})();
-
-/* ─── 2. BACKGROUND CANVAS PARTICLES ────────────────────────────── */
-(function initCanvas() {
-  const canvas = $('#bg-canvas');
-  if (!canvas) return;
-  const ctx = canvas.getContext('2d');
-
-  let W, H, particles = [], animFrame;
-
-  const colors = ['rgba(91,141,246,', 'rgba(124,92,191,', 'rgba(136,174,255,'];
-
-  class Particle {
-    constructor() { this.reset(); }
-    reset() {
-      this.x  = Math.random() * W;
-      this.y  = Math.random() * H;
-      this.r  = Math.random() * 1.5 + 0.3;
-      this.vx = (Math.random() - 0.5) * 0.3;
-      this.vy = (Math.random() - 0.5) * 0.3;
-      this.alpha = Math.random() * 0.5 + 0.1;
-      this.color = colors[Math.floor(Math.random() * colors.length)];
-    }
-    update() {
-      this.x += this.vx;
-      this.y += this.vy;
-      if (this.x < -10 || this.x > W + 10 || this.y < -10 || this.y > H + 10) this.reset();
-    }
-    draw() {
-      ctx.beginPath();
-      ctx.arc(this.x, this.y, this.r, 0, Math.PI * 2);
-      ctx.fillStyle = this.color + this.alpha + ')';
-      ctx.fill();
-    }
-  }
-
-  function resize() {
-    W = canvas.width  = window.innerWidth;
-    H = canvas.height = window.innerHeight;
-  }
-
-  function buildParticles() {
-    const count = Math.floor((W * H) / 14000);
-    particles = Array.from({ length: count }, () => new Particle());
-  }
-
-  // Draw subtle connecting lines between nearby particles
-  function drawConnections() {
-    const maxDist = 120;
-    for (let i = 0; i < particles.length; i++) {
-      for (let j = i + 1; j < particles.length; j++) {
-        const dx = particles[i].x - particles[j].x;
-        const dy = particles[i].y - particles[j].y;
-        const dist = Math.sqrt(dx * dx + dy * dy);
-        if (dist < maxDist) {
-          const alpha = (1 - dist / maxDist) * 0.08;
-          ctx.beginPath();
-          ctx.moveTo(particles[i].x, particles[i].y);
-          ctx.lineTo(particles[j].x, particles[j].y);
-          ctx.strokeStyle = `rgba(91,141,246,${alpha})`;
-          ctx.lineWidth = 0.5;
-          ctx.stroke();
-        }
-      }
-    }
-  }
-
-  function loop() {
-    ctx.clearRect(0, 0, W, H);
-    drawConnections();
-    particles.forEach(p => { p.update(); p.draw(); });
-    animFrame = requestAnimationFrame(loop);
-  }
-
-  resize();
-  buildParticles();
-  loop();
-
-  let resizeTimer;
-  window.addEventListener('resize', () => {
-    clearTimeout(resizeTimer);
-    resizeTimer = setTimeout(() => { resize(); buildParticles(); }, 200);
-  });
-})();
-
-/* ─── 3. CUSTOM CURSOR ───────────────────────────────────────────── */
-(function initCursor() {
-  const cursor   = $('#cursor');
-  const follower = $('#cursor-follower');
-  if (!cursor || !follower) return;
-  if (window.matchMedia('(hover: none)').matches) return;
-
-  let mx = -100, my = -100, fx = -100, fy = -100;
-
-  document.addEventListener('mousemove', e => { mx = e.clientX; my = e.clientY; });
-
-  let rafRunning = false;
-  const tick = () => {
-    cursor.style.left   = mx + 'px';
-    cursor.style.top    = my + 'px';
-    fx += (mx - fx) * 0.12;
-    fy += (my - fy) * 0.12;
-    follower.style.left = fx + 'px';
-    follower.style.top  = fy + 'px';
-    requestAnimationFrame(tick);
-  };
-  tick();
-
-  // Hover state on interactive elements
-  const targets = 'a, button, [role="button"], .project-card, .skill-icon-card, input, textarea';
-  document.addEventListener('mouseover', e => {
-    if (e.target.closest(targets)) document.body.classList.add('cursor-hover');
-  });
-  document.addEventListener('mouseout', e => {
-    if (e.target.closest(targets)) document.body.classList.remove('cursor-hover');
-  });
-})();
-
-/* ─── 4. THEME TOGGLE ────────────────────────────────────────────── */
-(function initTheme() {
-  const toggle = $('#theme-toggle');
-  const html   = document.documentElement;
-  const saved  = localStorage.getItem('portfolio-theme');
-  if (saved) html.setAttribute('data-theme', saved);
-
-  toggle && toggle.addEventListener('click', () => {
-    const current = html.getAttribute('data-theme');
-    const next    = current === 'dark' ? 'light' : 'dark';
-    html.setAttribute('data-theme', next);
-    localStorage.setItem('portfolio-theme', next);
-  });
-})();
-
-/* ─── 5. NAVBAR ──────────────────────────────────────────────────── */
-(function initNavbar() {
-  const navbar = $('#navbar');
-  const burger = $('#nav-burger');
-  const mobile = $('#nav-mobile');
-  if (!navbar) return;
-
-  // Shrink on scroll
-  const onScroll = () => {
-    if (window.scrollY > 60) navbar.classList.add('scrolled');
-    else navbar.classList.remove('scrolled');
-    highlightNav();
-  };
-  window.addEventListener('scroll', onScroll, { passive: true });
-  onScroll();
-
-  // Mobile menu
-  burger && burger.addEventListener('click', () => {
-    const open = burger.classList.toggle('active');
-    burger.setAttribute('aria-expanded', open);
-    mobile && mobile.classList.toggle('open', open);
-    mobile && mobile.setAttribute('aria-hidden', !open);
-    document.body.classList.toggle('no-scroll', open);
-  });
-
-  // Close mobile on link click
-  $$('.mobile-link').forEach(link => {
-    link.addEventListener('click', () => {
-      burger && burger.classList.remove('active');
-      burger && burger.setAttribute('aria-expanded', false);
-      mobile && mobile.classList.remove('open');
-      mobile && mobile.setAttribute('aria-hidden', true);
-      document.body.classList.remove('no-scroll');
-    });
-  });
-
-  // Active section highlight
-  function highlightNav() {
-    const sections = $$('section[id]');
-    const scrollY  = window.scrollY + 120;
-    let current = '';
-    sections.forEach(s => {
-      if (scrollY >= s.offsetTop) current = s.id;
-    });
-    $$('.nav-link').forEach(link => {
-      const active = link.dataset.section === current;
-      link.classList.toggle('active', active);
-    });
-  }
-})();
-
-/* ─── 6. TYPING ANIMATION ────────────────────────────────────────── */
-(function initTyping() {
-  const el = $('#typing-text');
-  if (!el) return;
-
-  const phrases = [
-    'scalable backends.',
-    'robust REST APIs.',
-    'Django applications.',
-    'automation tools.',
-    'things that matter.',
-  ];
-
-  let phraseIdx = 0, charIdx = 0, deleting = false, pausing = false;
-
-  const PAUSE_AFTER_TYPE  = 2200;
-  const PAUSE_AFTER_DEL   = 400;
-  const TYPE_SPEED_BASE   = 70;
-  const DEL_SPEED_BASE    = 40;
-  const SPEED_JITTER      = 30;
-
-  function tick() {
-    const phrase = phrases[phraseIdx];
-
-    if (pausing) return;
-
-    if (!deleting) {
-      // Typing
-      charIdx++;
-      el.textContent = phrase.slice(0, charIdx);
-
-      if (charIdx === phrase.length) {
-        pausing = true;
-        setTimeout(() => { pausing = false; deleting = true; tick(); }, PAUSE_AFTER_TYPE);
-        return;
-      }
-    } else {
-      // Deleting
-      charIdx--;
-      el.textContent = phrase.slice(0, charIdx);
-
-      if (charIdx === 0) {
-        deleting = false;
-        phraseIdx = (phraseIdx + 1) % phrases.length;
-        pausing = true;
-        setTimeout(() => { pausing = false; tick(); }, PAUSE_AFTER_DEL);
-        return;
-      }
-    }
-
-    const speed = deleting
-      ? DEL_SPEED_BASE + Math.random() * SPEED_JITTER
-      : TYPE_SPEED_BASE + Math.random() * SPEED_JITTER;
-
-    setTimeout(tick, speed);
-  }
-
-  setTimeout(tick, 800);
-})();
-
-/* ─── 7. STAT COUNTER ────────────────────────────────────────────── */
-function animateCounter(el, target, duration = 1500) {
-  const start = performance.now();
-  const step  = (now) => {
-    const progress = clamp((now - start) / duration, 0, 1);
-    const eased    = 1 - Math.pow(1 - progress, 3);
-    el.textContent = Math.round(eased * target);
-    if (progress < 1) requestAnimationFrame(step);
-  };
-  requestAnimationFrame(step);
-}
-
-/* ─── 8. SCROLL REVEAL + INTERSECTION OBSERVER ───────────────────── */
-function isInViewport(el) {
-  const rect = el.getBoundingClientRect();
-  return rect.top < window.innerHeight - 60 && rect.bottom > 0;
-}
-
-(function initScrollReveal() {
-  const revealEls = $$('.reveal-up, .reveal-left, .reveal-right');
-  const skillFills = $$('.skill-bar-fill');
-  const counters   = $$('.stat-number[data-count]');
-  const alreadyAnimated = new WeakSet();
-
-  const observer = new IntersectionObserver((entries) => {
-    entries.forEach(entry => {
-      if (!entry.isIntersecting || alreadyAnimated.has(entry.target)) return;
-      const el = entry.target;
-
-      // Reveal animation
-      if (el.classList.contains('reveal-up') ||
-          el.classList.contains('reveal-left') ||
-          el.classList.contains('reveal-right')) {
-        el.classList.add('visible');
-        alreadyAnimated.add(el);
-      }
-
-      // Skill bars
-      if (el.classList.contains('skill-bar-fill')) {
-        const w = el.dataset.width || '0';
-        el.style.width = w + '%';
-        alreadyAnimated.add(el);
-      }
-
-      // Stat counters
-      if (el.dataset.count) {
-        animateCounter(el, parseInt(el.dataset.count));
-        alreadyAnimated.add(el);
-      }
-    });
-  }, { threshold: 0.15, rootMargin: '0px 0px -40px 0px' });
-
-  revealEls.forEach(el => observer.observe(el));
-  skillFills.forEach(el => observer.observe(el));
-  counters.forEach(el => observer.observe(el));
-})();
-
-/* ─── 9. PROJECTS FILTER ─────────────────────────────────────────── */
-(function initProjectsFilter() {
-  const buttons = $$('.filter-btn');
-  const cards   = $$('.project-card');
-  if (!buttons.length) return;
-
-  buttons.forEach(btn => {
-    btn.addEventListener('click', () => {
-      buttons.forEach(b => { b.classList.remove('active'); b.setAttribute('aria-selected', 'false'); });
-      btn.classList.add('active');
-      btn.setAttribute('aria-selected', 'true');
-
-      const filter = btn.dataset.filter;
-
-      cards.forEach((card, i) => {
-        const show = filter === 'all' || card.dataset.category === filter;
-        if (show) {
-          card.classList.remove('hide');
-          card.style.animationDelay = (i * 0.08) + 's';
+    /* ========================================================
+       1. PRELOADER STATE
+    ======================================================== */
+    const preloader = document.getElementById('preloader');
+    const fill = document.querySelector('.preloader-fill');
+    const text = document.querySelector('.preloader-text');
+    
+    let progress = 0;
+    const interval = setInterval(() => {
+        progress += Math.random() * 15 + 5;
+        if (progress >= 100) {
+            progress = 100;
+            clearInterval(interval);
+            fill.style.width = '100%';
+            text.textContent = 'Ready';
+            setTimeout(() => {
+                preloader.classList.add('hidden');
+                initScrollReveals();
+            }, 300);
         } else {
-          card.classList.add('hide');
+            fill.style.width = `${Math.floor(progress)}%`;
+            text.textContent = `Loading... ${Math.floor(progress)}%`;
         }
-      });
-    });
-  });
-})();
+    }, 45);
 
-/* ─── 10. TESTIMONIALS SLIDER ────────────────────────────────────── */
-(function initTestimonials() {
-  const track    = $('#testimonials-track');
-  const prevBtn  = $('#testi-prev');
-  const nextBtn  = $('#testi-next');
-  const dotsWrap = $('#testi-dots');
-  if (!track) return;
 
-  const cards = $$('.testimonial-card', track);
-  let current = 0;
-  let autoTimer;
+    /* ========================================================
+       2. THREE.JS — ORGANIC REFRACTIVE BLOB ENGINE
+    ======================================================== */
+    const canvas = document.getElementById('bg-canvas');
+    if (canvas) {
+        let renderer, scene, camera, mesh, light1, light2, ambientLight;
+        let clock = new THREE.Clock();
+        
+        // Mouse interaction targets
+        let mouse = { x: 0, y: 0, targetX: 0, targetY: 0 };
+        let scrollY = 0;
+        let isDark = document.documentElement.getAttribute('data-theme') === 'dark';
 
-  // Build dots
-  cards.forEach((_, i) => {
-    const dot = document.createElement('button');
-    dot.className = 'testi-dot' + (i === 0 ? ' active' : '');
-    dot.setAttribute('role', 'tab');
-    dot.setAttribute('aria-label', `Go to testimonial ${i + 1}`);
-    dot.setAttribute('aria-selected', i === 0 ? 'true' : 'false');
-    dot.addEventListener('click', () => goTo(i));
-    dotsWrap && dotsWrap.appendChild(dot);
-  });
+        function initThree() {
+            // Scene Setup
+            scene = new THREE.Scene();
 
-  function goTo(idx) {
-    current = (idx + cards.length) % cards.length;
-    track.style.transform = `translateX(-${current * 100 / cards.length}%)`;
+            // Camera Setup
+            camera = new THREE.PerspectiveCamera(45, window.innerWidth / window.innerHeight, 0.1, 100);
+            camera.position.z = 8;
 
-    const dots = $$('.testi-dot', dotsWrap);
-    dots.forEach((d, i) => {
-      d.classList.toggle('active', i === current);
-      d.setAttribute('aria-selected', i === current ? 'true' : 'false');
-    });
+            // Renderer Setup
+            renderer = new THREE.WebGLRenderer({ canvas: canvas, antialias: true, alpha: true });
+            renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
+            renderer.setSize(window.innerWidth, window.innerHeight);
 
-    resetAuto();
-  }
+            // Lighting Setup - Organic warm colors that fit light/dark themes
+            ambientLight = new THREE.AmbientLight(0xffffff, isDark ? 0.2 : 0.85);
+            scene.add(ambientLight);
 
-  function resetAuto() {
-    clearInterval(autoTimer);
-    autoTimer = setInterval(() => goTo(current + 1), 5000);
-  }
+            light1 = new THREE.DirectionalLight(0xd25d38, isDark ? 2.5 : 1.5); // Rust accent color
+            light1.position.set(5, 5, 2);
+            scene.add(light1);
 
-  prevBtn && prevBtn.addEventListener('click', () => goTo(current - 1));
-  nextBtn && nextBtn.addEventListener('click', () => goTo(current + 1));
+            light2 = new THREE.DirectionalLight(0x2f4858, isDark ? 2.0 : 0.8); // Deep Slate blue
+            light2.position.set(-5, -5, 2);
+            scene.add(light2);
 
-  // Swipe
-  let startX = 0;
-  track.addEventListener('touchstart', e => { startX = e.touches[0].clientX; }, { passive: true });
-  track.addEventListener('touchend', e => {
-    const diff = startX - e.changedTouches[0].clientX;
-    if (Math.abs(diff) > 40) goTo(current + (diff > 0 ? 1 : -1));
-  });
+            // Create geometry (Detailed Icosahedron for smooth vertex morphing)
+            const geometry = new THREE.IcosahedronGeometry(2.0, 32);
 
-  resetAuto();
-})();
+            // Store original positions for math displacement
+            const positionAttribute = geometry.attributes.position;
+            const originalPositions = [];
+            for (let i = 0; i < positionAttribute.count; i++) {
+                originalPositions.push(new THREE.Vector3(
+                    positionAttribute.getX(i),
+                    positionAttribute.getY(i),
+                    positionAttribute.getZ(i)
+                ));
+            }
+            geometry.userData = { originalPositions };
 
-/* ─── 11. CONTACT FORM ───────────────────────────────────────────── */
-(function initContactForm() {
-  const form    = $('#contact-form');
-  const success = $('#form-success');
-  if (!form) return;
+            // Material - Clay / Pearl-like shader material simulation with physical material
+            const material = new THREE.MeshPhysicalMaterial({
+                color: isDark ? 0x18181b : 0xfcfbfa,
+                roughness: 0.2,
+                metalness: isDark ? 0.8 : 0.1,
+                clearcoat: 0.8,
+                clearcoatRoughness: 0.1,
+                transmission: isDark ? 0.3 : 0.8, // Frosty glass refraction feel
+                ior: 1.5,
+                thickness: 1.5,
+                side: THREE.DoubleSide
+            });
 
-  form.addEventListener('submit', e => {
-    e.preventDefault();
+            mesh = new THREE.Mesh(geometry, material);
+            scene.add(mesh);
 
-    const btn = $('button[type="submit"]', form);
-    if (btn) {
-      const origText = btn.querySelector('.btn-text').textContent;
-      btn.querySelector('.btn-text').textContent = 'Sending...';
-      btn.disabled = true;
+            // Event Listeners
+            window.addEventListener('mousemove', onMouseMove);
+            window.addEventListener('scroll', onScroll);
+            window.addEventListener('resize', onResize);
 
-      setTimeout(() => {
-        btn.querySelector('.btn-text').textContent = origText;
-        btn.disabled = false;
-        form.reset();
-        if (success) {
-          success.removeAttribute('hidden');
-          setTimeout(() => success.setAttribute('hidden', ''), 4000);
+            animate();
         }
-      }, 1500);
+
+        function onMouseMove(event) {
+            // Normalise mouse position
+            mouse.targetX = (event.clientX / window.innerWidth) - 0.5;
+            mouse.targetY = (event.clientY / window.innerHeight) - 0.5;
+        }
+
+        function onScroll() {
+            scrollY = window.scrollY;
+        }
+
+        function onResize() {
+            camera.aspect = window.innerWidth / window.innerHeight;
+            camera.updateProjectionMatrix();
+            renderer.setSize(window.innerWidth, window.innerHeight);
+        }
+
+        // Custom mathematical noise function for organic vertex displacement
+        // Combined sine waves simulate a 3D simplex-like wave system
+        function morphGeometry(time) {
+            const original = mesh.geometry.userData.originalPositions;
+            const positionAttribute = mesh.geometry.attributes.position;
+            const scrollFactor = scrollY * 0.0015;
+
+            for (let i = 0; i < positionAttribute.count; i++) {
+                const vertex = original[i].clone();
+
+                // Compute noise-like wave displacements based on vertex position & time
+                const waveX = Math.sin(vertex.x * 2.0 + time * 1.5 + scrollFactor) * 0.15;
+                const waveY = Math.cos(vertex.y * 2.2 + time * 1.8 - scrollFactor) * 0.15;
+                const waveZ = Math.sin(vertex.z * 1.8 + time * 1.2 + mouse.x * 2.0) * 0.15;
+
+                // Push vertices outward along normal
+                const displacement = waveX + waveY + waveZ;
+                vertex.addScaledVector(vertex.clone().normalize(), displacement);
+
+                // Update position
+                positionAttribute.setXYZ(i, vertex.x, vertex.y, vertex.z);
+            }
+
+            positionAttribute.needsUpdate = true;
+            mesh.geometry.computeVertexNormals();
+        }
+
+        function animate() {
+            requestAnimationFrame(animate);
+
+            const elapsed = clock.getElapsedTime();
+
+            // Smooth interpolation for mouse movements
+            mouse.x += (mouse.targetX - mouse.x) * 0.08;
+            mouse.y += (mouse.targetY - mouse.y) * 0.08;
+
+            // Slow mesh rotation & orbit
+            mesh.rotation.y = elapsed * 0.12 + mouse.x * 0.5;
+            mesh.rotation.x = elapsed * 0.08 - mouse.y * 0.5;
+
+            // Morph geometry
+            morphGeometry(elapsed);
+
+            // React mesh position and scale to scroll
+            const scrollRatio = scrollY / (document.body.scrollHeight - window.innerHeight || 1);
+            mesh.position.y = -scrollRatio * 3.5;
+            mesh.position.x = Math.sin(elapsed * 0.25) * 0.5 + (mouse.x * 0.8);
+            
+            // Render
+            renderer.render(scene, camera);
+        }
+
+        // Re-theme Three.js mesh & lighting on toggle
+        window.updateThreeTheme = function(darkState) {
+            isDark = darkState;
+            if (!mesh) return;
+
+            // Adjust lights strength and ambient properties
+            ambientLight.intensity = isDark ? 0.3 : 0.85;
+            light1.intensity = isDark ? 2.5 : 1.5;
+            light2.intensity = isDark ? 2.0 : 0.8;
+
+            // Interpolate materials properties
+            mesh.material.color.setHex(isDark ? 0x18181b : 0xfcfbfa);
+            mesh.material.metalness = isDark ? 0.8 : 0.1;
+            mesh.material.transmission = isDark ? 0.3 : 0.8;
+            mesh.material.needsUpdate = true;
+        };
+
+        initThree();
     }
-  });
-})();
 
-/* ─── 12. SMOOTH SCROLL ──────────────────────────────────────────── */
-(function initSmoothScroll() {
-  document.addEventListener('click', e => {
-    const link = e.target.closest('a[href^="#"]');
-    if (!link) return;
-    const href = link.getAttribute('href');
-    if (!href || href === '#') return;
-    const target = document.querySelector(href);
-    if (!target) return;
-    e.preventDefault();
-    const navH = parseInt(getComputedStyle(document.documentElement).getPropertyValue('--nav-h-sm')) || 60;
-    const top  = target.getBoundingClientRect().top + window.scrollY - navH;
-    window.scrollTo({ top, behavior: 'smooth' });
-  });
-})();
 
-/* ─── 13. FOOTER YEAR ────────────────────────────────────────────── */
-(function setYear() {
-  const el = $('#footer-year');
-  if (el) el.textContent = new Date().getFullYear();
-})();
+    /* ========================================================
+       3. TYPEWRITER / BURST TEXT
+    ======================================================= */
+    const typingSpan = document.getElementById('typing-text');
+    if (typingSpan) {
+        const roles = [
+            'scalable backends.',
+            'clean REST APIs.',
+            'secure Django apps.',
+            'efficient SQL code.',
+            'automation scripts.'
+        ];
+        
+        let roleIdx = 0;
+        let charIdx = 0;
+        let isDeleting = false;
+        let typingSpeed = 70;
 
-/* ─── 14. PARALLAX HERO ──────────────────────────────────────────── */
-(function initParallax() {
-  const hero = $('#hero');
-  if (!hero) return;
-  if (window.matchMedia('(prefers-reduced-motion: reduce)').matches) return;
+        function typeEffect() {
+            const currentRole = roles[roleIdx];
+            
+            if (isDeleting) {
+                charIdx--;
+                typingSpeed = 35;
+            } else {
+                charIdx++;
+                typingSpeed = 75;
+            }
 
-  const card = $('.hero-card', hero);
+            typingSpan.textContent = currentRole.substring(0, charIdx);
 
-  window.addEventListener('scroll', () => {
-    const scrollY = window.scrollY;
-    if (scrollY > window.innerHeight) return;
-    const factor = scrollY * 0.3;
-    if (card) card.style.transform = `perspective(1000px) rotateY(-5deg) rotateX(3deg) translateY(${factor * 0.15}px)`;
-  }, { passive: true });
+            if (!isDeleting && charIdx === currentRole.length) {
+                isDeleting = true;
+                typingSpeed = 1600; // Pause at end of role
+            } else if (isDeleting && charIdx === 0) {
+                isDeleting = false;
+                roleIdx = (roleIdx + 1) % roles.length;
+                typingSpeed = 400; // Pause before typing next
+            }
 
-  hero.addEventListener('mousemove', e => {
-    const rect = hero.getBoundingClientRect();
-    const cx = (e.clientX - rect.left) / rect.width  - 0.5;
-    const cy = (e.clientY - rect.top)  / rect.height - 0.5;
-    if (card) {
-      card.style.transform = `perspective(1000px) rotateY(${cx * 8}deg) rotateX(${-cy * 5}deg)`;
+            setTimeout(typeEffect, typingSpeed);
+        }
+        
+        setTimeout(typeEffect, 800);
     }
-  });
-  hero.addEventListener('mouseleave', () => {
-    if (card) card.style.transform = 'perspective(1000px) rotateY(-5deg) rotateX(3deg)';
-  });
-})();
 
-/* ─── 15. BUTTON RIPPLE ──────────────────────────────────────────── */
-(function initRipple() {
-  document.addEventListener('click', e => {
-    const btn = e.target.closest('.btn, .filter-btn, .testi-btn');
-    if (!btn) return;
 
-    const ripple = document.createElement('span');
-    const rect   = btn.getBoundingClientRect();
-    const size   = Math.max(rect.width, rect.height) * 2;
-    const x      = e.clientX - rect.left - size / 2;
-    const y      = e.clientY - rect.top  - size / 2;
+    /* ========================================================
+       4. SCROLL INTERSECTION OBSERVERS (REVEALS)
+    ======================================================== */
+    function initScrollReveals() {
+        const revealElements = document.querySelectorAll('.reveal-up, .reveal-left, .reveal-right');
+        
+        const observer = new IntersectionObserver((entries) => {
+            entries.forEach(entry => {
+                if (entry.isIntersecting) {
+                    entry.target.classList.add('visible');
+                    // Animate skill bars specifically if they enter view
+                    if (entry.target.id === 'about') {
+                        animateSkillBars();
+                    }
+                    observer.unobserve(entry.target);
+                }
+            });
+        }, {
+            threshold: 0.15,
+            rootMargin: '0px 0px -50px 0px'
+        });
 
-    ripple.style.cssText = `
-      position: absolute;
-      width: ${size}px; height: ${size}px;
-      left: ${x}px; top: ${y}px;
-      border-radius: 50%;
-      background: rgba(255,255,255,0.15);
-      transform: scale(0);
-      animation: ripple-anim 0.5s ease-out forwards;
-      pointer-events: none;
-    `;
+        revealElements.forEach(el => observer.observe(el));
+    }
 
-    // Ensure relative positioning
-    if (getComputedStyle(btn).position === 'static') btn.style.position = 'relative';
-    btn.style.overflow = 'hidden';
-    btn.appendChild(ripple);
-    ripple.addEventListener('animationend', () => ripple.remove());
-  });
+    function animateSkillBars() {
+        const skillFills = document.querySelectorAll('.skill-bar-fill');
+        skillFills.forEach(fill => {
+            const width = fill.getAttribute('data-width');
+            fill.style.width = `${width}%`;
+        });
+    }
 
-  // Inject keyframe if not already there
-  if (!document.getElementById('ripple-style')) {
-    const style = document.createElement('style');
-    style.id = 'ripple-style';
-    style.textContent = `
-      @keyframes ripple-anim {
-        to { transform: scale(1); opacity: 0; }
-      }
-    `;
-    document.head.appendChild(style);
-  }
-})();
+    // Scroll active link detection
+    const sections = document.querySelectorAll('section');
+    const navLinks = document.querySelectorAll('.nav-link');
 
-/* ─── 16. PROJECT CARD TILT ──────────────────────────────────────── */
-(function initCardTilt() {
-  if (window.matchMedia('(hover: none)').matches) return;
-  if (window.matchMedia('(prefers-reduced-motion: reduce)').matches) return;
+    window.addEventListener('scroll', () => {
+        let current = '';
+        sections.forEach(section => {
+            const sectionTop = section.offsetTop;
+            const sectionHeight = section.clientHeight;
+            if (pageYOffset >= (sectionTop - 160)) {
+                current = section.getAttribute('id');
+            }
+        });
 
-  $$('.project-card').forEach(card => {
-    card.addEventListener('mousemove', e => {
-      const rect = card.getBoundingClientRect();
-      const cx = (e.clientX - rect.left) / rect.width  - 0.5;
-      const cy = (e.clientY - rect.top)  / rect.height - 0.5;
-      card.style.transform = `translateY(-6px) perspective(800px) rotateX(${-cy * 5}deg) rotateY(${cx * 5}deg)`;
+        navLinks.forEach(link => {
+            link.classList.remove('active');
+            if (link.getAttribute('data-section') === current) {
+                link.classList.add('active');
+            }
+        });
+
+        // Add scroll class to navbar
+        const navbar = document.getElementById('navbar');
+        if (pageYOffset > 50) {
+            navbar.classList.add('scrolled');
+        } else {
+            navbar.classList.remove('scrolled');
+        }
     });
-    card.addEventListener('mouseleave', () => {
-      card.style.transform = '';
+
+
+    /* ========================================================
+       5. LIGHT / DARK MODE TOGGLE DRIVE
+    ======================================================== */
+    const themeBtn = document.getElementById('theme-toggle');
+    if (themeBtn) {
+        // Initial setup from default state
+        let currentTheme = localStorage.getItem('theme') || 'dark';
+        document.documentElement.setAttribute('data-theme', currentTheme);
+        
+        themeBtn.addEventListener('click', () => {
+            let nextTheme = document.documentElement.getAttribute('data-theme') === 'dark' ? 'light' : 'dark';
+            document.documentElement.setAttribute('data-theme', nextTheme);
+            localStorage.setItem('theme', nextTheme);
+            
+            // Push theme change to Three.js environment
+            if (window.updateThreeTheme) {
+                window.updateThreeTheme(nextTheme === 'dark');
+            }
+        });
+
+        // Push early state to Three.js
+        setTimeout(() => {
+            if (window.updateThreeTheme) {
+                window.updateThreeTheme(currentTheme === 'dark');
+            }
+        }, 500);
+    }
+
+
+    /* ========================================================
+       6. CUSTOM CURSOR MOTION
+    ======================================================== */
+    const cursor = document.getElementById('cursor');
+    const follower = document.getElementById('cursor-follower');
+    
+    if (cursor && follower) {
+        let mouseX = 0, mouseY = 0;
+        let followX = 0, followY = 0;
+
+        window.addEventListener('mousemove', (e) => {
+            mouseX = e.clientX;
+            mouseY = e.clientY;
+            cursor.style.left = `${mouseX}px`;
+            cursor.style.top = `${mouseY}px`;
+        });
+
+        function animateFollower() {
+            followX += (mouseX - followX) * 0.12;
+            followY += (mouseY - followY) * 0.12;
+            follower.style.left = `${followX}px`;
+            follower.style.top = `${followY}px`;
+            requestAnimationFrame(animateFollower);
+        }
+        animateFollower();
+
+        // Detect hover over clickable elements
+        const hoverables = document.querySelectorAll('a, button, [role="tab"], .project-card, .contact-card');
+        hoverables.forEach(el => {
+            el.addEventListener('mouseenter', () => document.body.classList.add('cursor-hover'));
+            el.addEventListener('mouseleave', () => document.body.classList.remove('cursor-hover'));
+        });
+    }
+
+
+    /* ========================================================
+       7. CLICK PARTICLE BURSTS (Dust/Sand Spray)
+    ======================================================== */
+    document.addEventListener('click', (e) => {
+        // Exclude inputs, textarea or buttons
+        if (e.target.closest('input, textarea, button, a')) return;
+
+        createClickBurst(e.clientX, e.clientY);
     });
-  });
-})();
 
-/* ─── 17. KEYBOARD ACCESSIBILITY ─────────────────────────────────── */
-(function initKeyboard() {
-  // Allow project cards to be activated with Enter/Space
-  $$('.project-card[tabindex]').forEach(card => {
-    card.addEventListener('keydown', e => {
-      if (e.key === 'Enter' || e.key === ' ') {
-        e.preventDefault();
-        const link = card.querySelector('.project-link');
-        if (link) link.click();
-      }
+    function createClickBurst(x, y) {
+        const particleCount = 8;
+        const container = document.body;
+        const color = getComputedStyle(document.documentElement).getPropertyValue('--accent').trim();
+
+        for (let i = 0; i < particleCount; i++) {
+            const particle = document.createElement('div');
+            const angle = (i / particleCount) * Math.PI * 2 + (Math.random() * 0.4);
+            const speed = Math.random() * 45 + 15;
+            
+            particle.style.cssText = `
+                position: fixed;
+                left: ${x}px;
+                top: ${y}px;
+                width: 4px;
+                height: 4px;
+                background-color: ${color};
+                border-radius: 50%;
+                pointer-events: none;
+                z-index: 10005;
+                opacity: 0.75;
+                transition: transform 0.6s var(--ease-out-expo), opacity 0.6s var(--ease-out-expo);
+            `;
+            container.appendChild(particle);
+
+            // Let them shoot outwards next frame
+            requestAnimationFrame(() => {
+                const moveX = Math.cos(angle) * speed;
+                const moveY = Math.sin(angle) * speed;
+                particle.style.transform = `translate(${moveX}px, ${moveY}px) scale(0.2)`;
+                particle.style.opacity = '0';
+            });
+
+            // Cleanup
+            setTimeout(() => {
+                particle.remove();
+            }, 600);
+        }
+    }
+
+
+    /* ========================================================
+       8. PROJECT FILTER LOGIC
+    ======================================================== */
+    const filterButtons = document.querySelectorAll('.filter-btn');
+    const projectCards = document.querySelectorAll('.project-card');
+
+    filterButtons.forEach(btn => {
+        btn.addEventListener('click', (e) => {
+            filterButtons.forEach(b => {
+                b.classList.remove('active');
+                b.setAttribute('aria-selected', 'false');
+            });
+            btn.classList.add('active');
+            btn.setAttribute('aria-selected', 'true');
+
+            const filterValue = btn.getAttribute('data-filter');
+
+            projectCards.forEach(card => {
+                const cardCat = card.getAttribute('data-category');
+                
+                // Set scale out or in smoothly
+                if (filterValue === 'all' || cardCat === filterValue) {
+                    card.style.display = 'flex';
+                    setTimeout(() => {
+                        card.style.opacity = '1';
+                        card.style.transform = 'scale(1)';
+                    }, 50);
+                } else {
+                    card.style.opacity = '0';
+                    card.style.transform = 'scale(0.92)';
+                    setTimeout(() => {
+                        card.style.display = 'none';
+                    }, 400);
+                }
+            });
+        });
     });
-  });
-})();
 
-/* ─── 18. LAZY IMAGE LOADING ─────────────────────────────────────── */
-(function initLazyLoad() {
-  const images = $$('img[data-src]');
-  if (!images.length) return;
 
-  const imgObserver = new IntersectionObserver(entries => {
-    entries.forEach(entry => {
-      if (!entry.isIntersecting) return;
-      const img = entry.target;
-      img.src = img.dataset.src;
-      img.removeAttribute('data-src');
-      imgObserver.unobserve(img);
-    });
-  }, { rootMargin: '200px' });
+    /* ========================================================
+       9. MOBILE NAV MENU DRIVE
+    ======================================================== */
+    const burger = document.getElementById('nav-burger');
+    const mobileMenu = document.getElementById('nav-mobile');
+    const mobileLinks = document.querySelectorAll('.mobile-link');
 
-  images.forEach(img => imgObserver.observe(img));
-})();
+    if (burger && mobileMenu) {
+        burger.addEventListener('click', () => {
+            const isOpen = burger.classList.toggle('open');
+            burger.setAttribute('aria-expanded', isOpen);
+            mobileMenu.classList.toggle('open', isOpen);
+            mobileMenu.setAttribute('aria-hidden', !isOpen);
+        });
 
-/* ─── 19. SECTION ENTRANCE GRADIENT PULSE ────────────────────────── */
-(function initSectionGlow() {
-  if (window.matchMedia('(prefers-reduced-motion: reduce)').matches) return;
+        mobileLinks.forEach(link => {
+            link.addEventListener('click', () => {
+                burger.classList.remove('open');
+                burger.setAttribute('aria-expanded', 'false');
+                mobileMenu.classList.remove('open');
+                mobileMenu.setAttribute('aria-hidden', 'true');
+            });
+        });
+    }
 
-  const sections = $$('section[id]');
-  const sectionObserver = new IntersectionObserver(entries => {
-    entries.forEach(entry => {
-      // Just a visual cue; let CSS handle transitions
-    });
-  }, { threshold: 0.2 });
 
-  sections.forEach(s => sectionObserver.observe(s));
-})();
+    /* ========================================================
+       10. COUNTER ANIMATION FOR STATS
+    ======================================================== */
+    function animateCounters() {
+        const counters = document.querySelectorAll('.stat-number[data-count]');
+        
+        counters.forEach(counter => {
+            const target = parseInt(counter.getAttribute('data-count'));
+            const duration = 2000; // 2 seconds
+            const increment = target / (duration / 16); // 60fps
+            let current = 0;
+            
+            const updateCounter = () => {
+                current += increment;
+                if (current < target) {
+                    counter.textContent = Math.floor(current);
+                    requestAnimationFrame(updateCounter);
+                } else {
+                    counter.textContent = target;
+                }
+            };
+            
+            updateCounter();
+        });
+    }
 
-/* ─── 20. ABOUT SECTION — SKILL PILLS STAGGER ────────────────────── */
-(function initPillStagger() {
-  const pills = $$('.pill');
-  pills.forEach((pill, i) => {
-    pill.style.transitionDelay = `${i * 0.05}s`;
-  });
-})();
+    // Trigger counter animation when hero section is visible
+    const heroSection = document.getElementById('hero');
+    if (heroSection) {
+        const counterObserver = new IntersectionObserver((entries) => {
+            entries.forEach(entry => {
+                if (entry.isIntersecting) {
+                    animateCounters();
+                    counterObserver.unobserve(entry.target);
+                }
+            });
+        }, { threshold: 0.5 });
+        
+        counterObserver.observe(heroSection);
+    }
 
-/* ─── 21. PAGE LOAD COMPLETE ─────────────────────────────────────── */
-window.addEventListener('load', () => {
-  // Final visibility pass after all assets loaded
-  $$('.reveal-up, .reveal-left, .reveal-right').forEach(el => {
-    if (isInViewport(el)) el.classList.add('visible');
-  });
+
+    /* ========================================================
+       11. CONTACT FORM HANDLING
+    ======================================================== */
+    const form = document.getElementById('contact-form');
+    const successMsg = document.getElementById('form-success');
+
+    if (form && successMsg) {
+        form.addEventListener('submit', (e) => {
+            e.preventDefault();
+            
+            // Trigger simple loading feedback on button
+            const submitBtn = form.querySelector('.btn-submit');
+            const submitBtnText = submitBtn.querySelector('.btn-text');
+            const origText = submitBtnText.textContent;
+            
+            submitBtnText.textContent = 'Sending...';
+            submitBtn.disabled = true;
+
+            // Simulate form submission to backend
+            setTimeout(() => {
+                form.reset();
+                submitBtnText.textContent = origText;
+                submitBtn.disabled = false;
+                
+                successMsg.removeAttribute('hidden');
+                
+                setTimeout(() => {
+                    successMsg.setAttribute('hidden', 'true');
+                }, 5000);
+            }, 1200);
+        });
+    }
+
+    // Update footer year dynamically
+    const footerYear = document.getElementById('footer-year');
+    if (footerYear) {
+        footerYear.textContent = new Date().getFullYear();
+    }
+
 });
-
-console.log('%c👋 Hi there!', 'font-family: monospace; font-size: 18px; color: #5b8df6;');
-console.log('%cPortfolio by Emmanuel Oluyemi — Built with pure HTML, CSS & JS 🇳🇬', 'font-family: monospace; font-size: 12px; color: #8fa0bb;');
